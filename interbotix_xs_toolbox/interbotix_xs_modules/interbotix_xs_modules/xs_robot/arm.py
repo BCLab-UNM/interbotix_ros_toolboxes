@@ -438,6 +438,36 @@ class InterbotixArmXSInterface:
             blocking=blocking
         )
 
+    def start_lift(
+            self,
+            moving_time: float = None,
+            accel_time: float = None,
+            blocking: bool = True
+    ) -> None:
+        #  [0, 0.53495232, 0.66342641, -1.09837873]
+        self.core.get_node().logdebug('Going to experiment home pose')
+        self._publish_commands(
+            positions=[1.5, 0.52447963, 0.67205733, -1.17653696],
+            moving_time=moving_time,
+            accel_time=accel_time,
+            blocking=blocking
+        )
+
+    def lift(
+            self,
+            moving_time: float = None,
+            accel_time: float = None,
+            blocking: bool = True
+    ) -> None:
+        #  [0, 0.53495232, 0.66342641, -1.09837873]
+        self.core.get_node().logdebug('Going to experiment home pose')
+        self._publish_commands(
+            positions=[1.5, -0.12922689, -0.19752692, 0.34675381],
+            moving_time=moving_time,
+            accel_time=accel_time,
+            blocking=blocking
+        )
+
     def set_single_joint_position(
         self,
         joint_name: str,
