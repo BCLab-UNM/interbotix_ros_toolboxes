@@ -54,6 +54,8 @@ from rclpy.constants import S_TO_NS
 from rclpy.duration import Duration
 from rclpy.logging import LoggingSeverity
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
+import ikpy.chain
+import os
 
 
 REV: float = 2 * np.pi
@@ -194,6 +196,14 @@ class InterbotixArmXSInterface:
         self.iterative_update_fk = iterative_update_fk
 
         self.robot_des: mrd.ModernRoboticsDescription = getattr(mrd, self.robot_model)
+
+        root_dir = os.getcwd()
+        self.arm_chain = ikpy.chain.Chain.from_urdf_file(
+            urdf_file='/home/xavier/projects/MARIAM/px100.urdf',
+            base_elements=['px100/base_link'],
+            active_links_mask=[False, True, True, True, True, False, False],
+            symbolic=True
+        )
 
         self.future_group_info = self.core.srv_get_info.call_async(
             RobotInfo.Request(cmd_type='group', name=group_name)
@@ -444,8 +454,15 @@ class InterbotixArmXSInterface:
             accel_time: float = None,
             blocking: bool = True
     ) -> None:
-        #  [0, 0.53495232, 0.66342641, -1.09837873]
-        self.core.get_node().logdebug('Going to experiment home pose')
+        """
+        This method moves the arm into a position suitable for starting a lift.
+
+        :param moving_time: (optional) duration in seconds that the robot should move
+        :param accel_time: (optional) duration in seconds that that robot should spend
+            accelerating/decelerating (must be less than or equal to half the moving_time)
+        :param blocking: (optional) whether the function should wait to return control to the user
+            until the robot finishes moving
+        """
         self._publish_commands(
             positions=[1.5, 0.52447963, 0.67205733, -1.17653696],
             moving_time=moving_time,
@@ -459,8 +476,15 @@ class InterbotixArmXSInterface:
             accel_time: float = None,
             blocking: bool = True
     ) -> None:
-        #  [0, 0.53495232, 0.66342641, -1.09837873]
-        self.core.get_node().logdebug('Going to experiment home pose')
+        """
+        Moves the arm straight up from the 'start_lift' pose.
+
+        :param moving_time: (optional) duration in seconds that the robot should move
+        :param accel_time: (optional) duration in seconds that that robot should spend
+            accelerating/decelerating (must be less than or equal to half the moving_time)
+        :param blocking: (optional) whether the function should wait to return control to the user
+            until the robot finishes moving
+        """
         self._publish_commands(
             positions=[1.5, -0.12922689, -0.19752692, 0.34675381],
             moving_time=moving_time,
@@ -506,6 +530,37 @@ class InterbotixArmXSInterface:
         if self.iterative_update_fk:
             self._update_Tsb()
         return True
+
+    def set_ee_pose(
+        self,
+        target_position: List[float],
+        target_orientation: List[float],
+        orientation_mode: str,
+        execute: bool = True,
+        moving_time: float = None,
+        accel_time: float = None,
+        blocking: bool = True,
+    ) -> None:
+        start_time = self.core.get_node().get_clock().now()
+        joint_angles = self.arm_chain.inverse_kinematics(
+            target_position=target_position,
+            target_orientation=target_orientation,
+            orientation_mode=orientation_mode
+        )
+        end_time = self.core.get_node().get_clock().now()
+        self.core.get_node().get_logger().info(
+            f'Time (arm): {(end_time-start_time).nanoseconds / 1e9}')
+        joint_angles = joint_angles[1:5]
+
+        joint_angles = self._wrap_theta_list(joint_angles)
+        solution_found = self._check_joint_limits(joint_angles)
+
+        if solution_found:
+            self._publish_commands(
+                joint_angles, moving_time, accel_time, blocking
+            )
+        else:
+            self.core.get_node().get_logger().info('Could not move to target pose.')
 
     def set_ee_pose_matrix(
         self,
