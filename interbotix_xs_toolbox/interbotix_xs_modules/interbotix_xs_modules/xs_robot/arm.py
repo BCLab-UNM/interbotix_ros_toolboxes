@@ -197,13 +197,14 @@ class InterbotixArmXSInterface:
 
         self.robot_des: mrd.ModernRoboticsDescription = getattr(mrd, self.robot_model)
 
-        root_dir = os.getcwd()
-        self.arm_chain = ikpy.chain.Chain.from_urdf_file(
-            urdf_file='/home/xavier/projects/MARIAM/px100.urdf',
-            base_elements=['px100/base_link'],
-            active_links_mask=[False, True, True, True, True, False, False],
-            symbolic=True
-        )
+        urdf_file_path = os.path.join(os.getcwd(), 'px100.urdf')
+        if os.path.isfile(urdf_file_path):
+            self.arm_chain = ikpy.chain.Chain.from_urdf_file(
+                urdf_file='/home/xavier/projects/MARIAM/px100.urdf',
+                base_elements=['px100/base_link'],
+                active_links_mask=[False, True, True, True, True, False, False],
+                symbolic=True
+            )
 
         self.future_group_info = self.core.srv_get_info.call_async(
             RobotInfo.Request(cmd_type='group', name=group_name)
