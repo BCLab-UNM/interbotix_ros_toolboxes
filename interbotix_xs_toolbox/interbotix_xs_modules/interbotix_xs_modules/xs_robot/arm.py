@@ -54,9 +54,6 @@ from rclpy.constants import S_TO_NS
 from rclpy.duration import Duration
 from rclpy.logging import LoggingSeverity
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
-import ikpy.chain
-import os
-
 
 REV: float = 2 * np.pi
 """One complete revolution of a joint (2*pi)"""
@@ -196,15 +193,6 @@ class InterbotixArmXSInterface:
         self.iterative_update_fk = iterative_update_fk
 
         self.robot_des: mrd.ModernRoboticsDescription = getattr(mrd, self.robot_model)
-
-        urdf_file_path = os.path.join(os.getcwd(), 'px100.urdf')
-        if os.path.isfile(urdf_file_path):
-            self.arm_chain = ikpy.chain.Chain.from_urdf_file(
-                urdf_file='/home/xavier/projects/MARIAM/px100.urdf',
-                base_elements=['px100/base_link'],
-                active_links_mask=[False, True, True, True, True, False, False],
-                symbolic=True
-            )
 
         self.future_group_info = self.core.srv_get_info.call_async(
             RobotInfo.Request(cmd_type='group', name=group_name)
@@ -531,37 +519,6 @@ class InterbotixArmXSInterface:
         if self.iterative_update_fk:
             self._update_Tsb()
         return True
-
-    def set_ee_pose(
-        self,
-        target_position: List[float],
-        target_orientation: List[float],
-        orientation_mode: str,
-        execute: bool = True,
-        moving_time: float = None,
-        accel_time: float = None,
-        blocking: bool = True,
-    ) -> None:
-        start_time = self.core.get_node().get_clock().now()
-        joint_angles = self.arm_chain.inverse_kinematics(
-            target_position=target_position,
-            target_orientation=target_orientation,
-            orientation_mode=orientation_mode
-        )
-        end_time = self.core.get_node().get_clock().now()
-        self.core.get_node().get_logger().info(
-            f'Time (arm): {(end_time-start_time).nanoseconds / 1e9}')
-        joint_angles = joint_angles[1:5]
-
-        joint_angles = self._wrap_theta_list(joint_angles)
-        solution_found = self._check_joint_limits(joint_angles)
-
-        if solution_found:
-            self._publish_commands(
-                joint_angles, moving_time, accel_time, blocking
-            )
-        else:
-            self.core.get_node().get_logger().info('Could not move to target pose.')
 
     def set_ee_pose_matrix(
         self,
